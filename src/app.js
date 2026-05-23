@@ -9,6 +9,9 @@ const logger = require('./config/logger');
 
 const app = express();
 
+// Trust Railway/reverse-proxy headers so rate limiting and IP detection work correctly
+app.set('trust proxy', 1);
+
 // ─── Security ────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({

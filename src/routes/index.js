@@ -9,7 +9,7 @@ router.use('/auth', require('./auth'));
 
 // ─── Health (must also be before enrollments catch-all) ─────
 router.get('/health', (req, res) => {
-  res.json({ success: true, message: 'Mathaino API is running', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
+  res.json({ success: true, message: 'iLearn API is running', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
 });
 
 // ─── Users ──────────────────────────────────────────────

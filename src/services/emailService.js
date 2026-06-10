@@ -10,18 +10,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FROM = `"Mathaino" <${process.env.SMTP_USER}>`;
+const FROM = `"iLearn" <${process.env.SMTP_USER}>`;
 
 async function sendPasswordResetOTP(email, otp, firstName) {
   await transporter.sendMail({
     from: FROM,
     to: email,
-    subject: 'Your Mathaino password reset code',
+    subject: 'Your iLearn password reset code',
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#0d0d0d;border-radius:16px;border:1px solid #222;">
         <h2 style="color:#e8ff47;margin-bottom:8px;">Reset your password</h2>
         <p style="color:#aaa;font-size:14px;">Hi ${firstName || 'there'},</p>
-        <p style="color:#aaa;font-size:14px;">Use the code below to reset your Mathaino password. It expires in <strong style="color:#fff;">15 minutes</strong>.</p>
+        <p style="color:#aaa;font-size:14px;">Use the code below to reset your iLearn password. It expires in <strong style="color:#fff;">15 minutes</strong>.</p>
         <div style="text-align:center;margin:32px 0;">
           <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#e8ff47;background:#1a1a1a;padding:16px 28px;border-radius:12px;border:1px solid #333;">${otp}</span>
         </div>

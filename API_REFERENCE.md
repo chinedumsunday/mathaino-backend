@@ -193,6 +193,31 @@ Roles: SUPER_ADMIN
 
 ---
 
+## Live Classes & Focus-Mode Attendance
+
+All routes require auth. Lecturer routes require `LECTURER` / `FACULTY` / `SUPER_ADMIN`.
+
+| Method | Endpoint | Who | Purpose |
+|---|---|---|---|
+| POST | `/api/live-sessions` | Lecturer | Schedule a class. Body now also accepts `focusMode: boolean`. Platform `in_app` = in-app video room. |
+| GET | `/api/live-sessions?upcoming=true` | Any | Upcoming sessions — includes sessions currently `LIVE`. |
+| PATCH | `/api/live-sessions/:id/start` | Lecturer (creator) | Go live. Body: `{ focusMode? }`. Notifies enrolled students (`type: live_started`). |
+| PATCH | `/api/live-sessions/:id/end` | Lecturer (creator) | End class; finalizes all attendance records. |
+| POST | `/api/live-sessions/:id/join` | Enrolled student | Enter the classroom; creates/reactivates the attendance record. |
+| POST | `/api/live-sessions/:id/heartbeat` | Student | Body: `{ state: 'ACTIVE' \| 'BACKGROUND' }`. Sent every 10s and on app-switch. Credits presence time. |
+| POST | `/api/live-sessions/:id/leave` | Student | Marks the student as exited. |
+| GET | `/api/live-sessions/:id/attendance` | Lecturer (creator) | Roster with per-student `presence` (`ACTIVE` green / `BACKGROUND` amber / `EXITED` red / `NOT_JOINED`), `activeSeconds`, `attendancePct`, plus summary `counts`. |
+
+Presence rules: a student with no heartbeat for 45s (last state ACTIVE) or 3min (last state BACKGROUND) is treated as `EXITED`.
+
+## Broadcast Announcements
+
+| Method | Endpoint | Who | Purpose |
+|---|---|---|---|
+| POST | `/api/notifications/broadcast` | `SUPER_ADMIN`, `FACULTY` | Body: `{ title, message, audience?: 'ALL' \| 'STUDENT' \| 'LECTURER' }`. Creates a notification (`type: announcement`) for every active user in the audience. |
+
+---
+
 ## Error Responses
 
 All errors follow this shape:

@@ -42,6 +42,7 @@ model User {
   socialLikes     SocialLike[]
   socialComments  SocialComment[]
   liveSessions    LiveSession[]
+  attendances     SessionAttendance[]
 
   @@map("users")
 }
@@ -265,10 +266,14 @@ model LiveSession {
   scheduledAt DateTime          @map("scheduled_at")
   durationMin Int?              @map("duration_min")
   status      LiveSessionStatus @default(SCHEDULED)
+  focusMode   Boolean           @default(false) @map("focus_mode")
+  startedAt   DateTime?         @map("started_at")
+  endedAt     DateTime?         @map("ended_at")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
   course      Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
   creator     User              @relation(fields: [creatorId], references: [id])
+  attendances SessionAttendance[]
 
   @@map("live_sessions")
 }
@@ -278,6 +283,29 @@ enum LiveSessionStatus {
   LIVE
   ENDED
   CANCELLED
+}
+
+model SessionAttendance {
+  id                String          @id @default(uuid())
+  sessionId         String          @map("session_id")
+  userId            String          @map("user_id")
+  state             AttendanceState @default(ACTIVE)
+  joinedAt          DateTime        @default(now()) @map("joined_at")
+  lastSeenAt        DateTime        @default(now()) @map("last_seen_at")
+  leftAt            DateTime?       @map("left_at")
+  activeSeconds     Int             @default(0) @map("active_seconds")
+  backgroundSeconds Int             @default(0) @map("background_seconds")
+  session           LiveSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@map("session_attendances")
+}
+
+enum AttendanceState {
+  ACTIVE
+  BACKGROUND
+  EXITED
 }
 
 model AuditLog {

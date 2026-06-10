@@ -92,4 +92,34 @@ const deleteNotification = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Notification deleted' });
 });
 
-module.exports = { listNotifications, markRead, markAllRead, deleteNotification };
+/**
+ * POST /api/notifications/broadcast
+ * Admin/Faculty: send an announcement to every user.
+ * Body: { title, message, audience?: 'ALL' | 'STUDENT' | 'LECTURER' }
+ */
+const broadcast = asyncHandler(async (req, res) => {
+  const { title, message, audience = 'ALL' } = req.body;
+
+  if (!title?.trim() || !message?.trim()) {
+    throw ApiError.badRequest('title and message are required');
+  }
+
+  const where = { status: 'ACTIVE' };
+  if (audience === 'STUDENT' || audience === 'LECTURER') where.role = audience;
+
+  const users = await prisma.user.findMany({ where, select: { id: true } });
+
+  const { count } = await prisma.notification.createMany({
+    data: users.map(u => ({
+      userId: u.id,
+      title: title.trim(),
+      message: message.trim(),
+      type: 'announcement',
+      data: { sentBy: req.user.id },
+    })),
+  });
+
+  res.status(201).json({ success: true, message: `Announcement sent to ${count} users`, data: { count } });
+});
+
+module.exports = { listNotifications, markRead, markAllRead, deleteNotification, broadcast };

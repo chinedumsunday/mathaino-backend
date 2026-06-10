@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+const { notifyUsers } = require('../services/notificationService');
 
 /**
  * GET /api/notifications
@@ -109,17 +110,14 @@ const broadcast = asyncHandler(async (req, res) => {
 
   const users = await prisma.user.findMany({ where, select: { id: true } });
 
-  const { count } = await prisma.notification.createMany({
-    data: users.map(u => ({
-      userId: u.id,
-      title: title.trim(),
-      message: message.trim(),
-      type: 'announcement',
-      data: { sentBy: req.user.id },
-    })),
+  await notifyUsers(users.map(u => u.id), {
+    title: title.trim(),
+    message: message.trim(),
+    type: 'announcement',
+    data: { sentBy: req.user.id },
   });
 
-  res.status(201).json({ success: true, message: `Announcement sent to ${count} users`, data: { count } });
+  res.status(201).json({ success: true, message: `Announcement sent to ${users.length} users`, data: { count: users.length } });
 });
 
 module.exports = { listNotifications, markRead, markAllRead, deleteNotification, broadcast };

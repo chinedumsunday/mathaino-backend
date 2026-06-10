@@ -88,14 +88,15 @@ class AuthService {
   }
 
   /**
-   * Login: Verify Firebase ID token → find PG user → return JWT
+   * Login: Verify Firebase ID token → find PG user → return JWT.
+   * Social sign-ins (Google) auto-provision a Student account on first login.
    */
   static async login(idToken) {
     // Verify the Firebase token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
 
     // Find user in PostgreSQL
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { firebaseUid: decodedToken.uid },
       include: {
         facultyProfile: true,
@@ -105,7 +106,12 @@ class AuthService {
     });
 
     if (!user) {
-      throw ApiError.notFound('No account found — please register');
+      const provider = decodedToken.firebase?.sign_in_provider;
+      if (provider === 'google.com') {
+        user = await AuthService.provisionSocialUser(decodedToken);
+      } else {
+        throw ApiError.notFound('No account found — please register');
+      }
     }
 
     if (user.status === 'SUSPENDED') {
@@ -120,6 +126,45 @@ class AuthService {
 
     const tokens = AuthService.generateTokens(user);
     return { user: AuthService.sanitizeUser(user), ...tokens };
+  }
+
+  /**
+   * First-time social login (the brief's "SM login within app"):
+   * create a Student account from the Google profile.
+   */
+  static async provisionSocialUser(decodedToken) {
+    const email = decodedToken.email;
+    if (!email) throw ApiError.badRequest('Social account has no email');
+
+    const fullName = (decodedToken.name || email.split('@')[0]).trim();
+    const [firstName, ...rest] = fullName.split(/\s+/);
+    const lastName = rest.join(' ') || '-';
+
+    const user = await prisma.user.create({
+      data: {
+        firebaseUid: decodedToken.uid,
+        email,
+        firstName,
+        lastName,
+        avatarUrl: decodedToken.picture || null,
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        studentProfile: { create: {} },
+      },
+      include: {
+        facultyProfile: true,
+        lecturerProfile: true,
+        studentProfile: true,
+      },
+    });
+
+    await admin.auth().setCustomUserClaims(decodedToken.uid, {
+      role: user.role,
+      pgUserId: user.id,
+    }).catch(() => {});
+
+    logger.info(`Social sign-in provisioned new student: ${email}`);
+    return user;
   }
 
   /**

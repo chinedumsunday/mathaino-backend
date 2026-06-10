@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const {
-  listUsers, getUser, changeRole, changeStatus, updateProfile, getStats, createLecturer, createStudent, getLeaderboard,
+  listUsers, getUser, changeRole, changeStatus, updateProfile, updatePushToken, getStats, createLecturer, createStudent, getLeaderboard,
 } = require('../controllers/userController');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
@@ -12,6 +12,7 @@ router.use(authenticate);
 
 // Self-service
 router.patch('/profile', validate(updateProfileSchema), updateProfile);
+router.patch('/push-token', updatePushToken);
 
 // Leaderboard (all authenticated users)
 router.get('/leaderboard', getLeaderboard);

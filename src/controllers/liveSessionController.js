@@ -1,21 +1,7 @@
 const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-
-async function notifyUsers(userIds, { title, message, type, data, scheduledFor }) {
-  if (!userIds.length) return;
-  await prisma.notification.createMany({
-    data: userIds.map(userId => ({
-      userId,
-      title,
-      message,
-      type,
-      data: data || null,
-      scheduledFor: scheduledFor || null,
-    })),
-    skipDuplicates: true,
-  });
-}
+const { notifyUsers } = require('../services/notificationService');
 
 function formatDate(date) {
   return date.toLocaleString('en-US', {

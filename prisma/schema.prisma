@@ -19,6 +19,7 @@ model User {
   role            Role             @default(STUDENT)
   status          AccountStatus    @default(PENDING)
   bio             String?
+  pushToken       String?          @map("push_token")
   xp              Int              @default(0)
   streak          Int              @default(0)
   lastActiveAt    DateTime?        @map("last_active_at")

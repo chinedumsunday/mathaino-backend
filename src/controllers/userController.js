@@ -184,6 +184,21 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PATCH /api/users/push-token
+ * Save (or clear with null) the caller's Expo push token.
+ */
+const updatePushToken = asyncHandler(async (req, res) => {
+  const { pushToken } = req.body;
+
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: { pushToken: pushToken || null },
+  });
+
+  res.json({ success: true, message: pushToken ? 'Push token saved' : 'Push token cleared' });
+});
+
+/**
  * GET /api/users/stats
  * Dashboard stats (Super Admin)
  */
@@ -340,4 +355,4 @@ const getLeaderboard = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { users, period } });
 });
 
-module.exports = { listUsers, getUser, changeRole, changeStatus, updateProfile, getStats, createLecturer, createStudent, getLeaderboard };
+module.exports = { listUsers, getUser, changeRole, changeStatus, updateProfile, updatePushToken, getStats, createLecturer, createStudent, getLeaderboard };

@@ -88,12 +88,40 @@ class AuthService {
   }
 
   /**
+   * Verify a Firebase ID token, but fail fast when Google's servers are
+   * unreachable instead of hanging until the client gives up (HTTP 499s).
+   */
+  static async verifyIdTokenWithTimeout(idToken, ms = 8000) {
+    let timer;
+    try {
+      return await Promise.race([
+        admin.auth().verifyIdToken(idToken),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(ApiError.serviceUnavailable('Could not reach Google to verify your login. Please try again in a moment.')),
+            ms
+          );
+        }),
+      ]);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      if (/ETIMEDOUT|ENOTFOUND|ECONNRESET|network/i.test(err.message || '')) {
+        logger.error(`Token verification network failure: ${err.message}`);
+        throw ApiError.serviceUnavailable('Could not reach Google to verify your login. Please try again in a moment.');
+      }
+      throw ApiError.unauthorized('Invalid or expired login token. Please sign in again.');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * Login: Verify Firebase ID token → find PG user → return JWT.
    * Social sign-ins (Google) auto-provision a Student account on first login.
    */
   static async login(idToken) {
     // Verify the Firebase token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await AuthService.verifyIdTokenWithTimeout(idToken);
 
     // Find user in PostgreSQL
     let user = await prisma.user.findUnique({

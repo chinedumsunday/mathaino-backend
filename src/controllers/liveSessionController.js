@@ -2,6 +2,29 @@ const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { notifyUsers } = require('../services/notificationService');
+const jaas = require('../services/jaasService');
+
+// Build the URL the app opens for a session. For in-app classes with JaaS
+// configured, this is an 8x8.vc room with a signed JWT (lecturer = moderator,
+// no login prompt). Otherwise it's the stored link (external platform, or the
+// public meet.jit.si fallback).
+function meetingUrlFor(session, user, isCreator) {
+  if (session.platform === 'in_app' && jaas.isConfigured()) {
+    const room = jaas.roomFromLink(session.meetingLink) || `iLearn-${session.id}`;
+    const url = jaas.buildMeetingUrl({
+      room,
+      user: {
+        id: user.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Participant',
+        email: user.email || '',
+        avatar: user.avatarUrl || '',
+      },
+      moderator: isCreator,
+    });
+    if (url) return url;
+  }
+  return session.meetingLink;
+}
 
 function formatDate(date) {
   return date.toLocaleString('en-US', {
@@ -269,7 +292,9 @@ const joinLiveSession = asyncHandler(async (req, res) => {
     update: { state: 'ACTIVE', lastSeenAt: now, leftAt: null },
   });
 
-  res.json({ success: true, data: { session, attendance } });
+  const meetingUrl = meetingUrlFor(session, req.user, isCreator);
+
+  res.json({ success: true, data: { session, attendance, meetingUrl } });
 });
 
 // POST /api/live-sessions/:id/heartbeat { state: 'ACTIVE' | 'BACKGROUND' }

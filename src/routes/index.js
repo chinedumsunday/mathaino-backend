@@ -9,7 +9,16 @@ router.use('/auth', require('./auth'));
 
 // ─── Health (must also be before enrollments catch-all) ─────
 router.get('/health', (req, res) => {
-  res.json({ success: true, message: 'iLearn API is running', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
+  const jaas = require('../services/jaasService');
+  res.json({
+    success: true,
+    message: 'iLearn API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    // 'jaas' = in-app live classes use 8x8 rooms with signed JWTs (no
+    // moderator login prompt); 'public-fallback' = JAAS_* env vars missing
+    liveClassrooms: jaas.isConfigured() ? 'jaas' : 'public-fallback',
+  });
 });
 
 // ─── Users ──────────────────────────────────────────────
@@ -67,5 +76,8 @@ router.use('/notifications', require('./notifications'));
 
 // ─── Live Sessions ───────────────────────────────────────
 router.use('/live-sessions', require('./liveSessions'));
+
+// ─── Coursework document submissions (lecturer → admin) ──
+router.use('/coursework', require('./coursework'));
 
 module.exports = router;

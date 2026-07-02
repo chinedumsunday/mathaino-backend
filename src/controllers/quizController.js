@@ -38,13 +38,14 @@ const submitQuiz = asyncHandler(async (req, res) => {
 
   if (!questions.length) throw ApiError.badRequest('This quiz has no questions');
 
-  // Grade
+  // Grade — the correct answer index is deliberately NOT echoed back,
+  // so failing on purpose can't be used to farm the answer key
   let score = 0;
   const results = questions.map((q, i) => {
     const selected = answers[i] ?? -1;
     const correct = selected === q.correct;
     if (correct) score++;
-    return { question: q.q, selected, correct: q.correct, isCorrect: correct };
+    return { question: q.q, selected, isCorrect: correct };
   });
 
   const total = questions.length;

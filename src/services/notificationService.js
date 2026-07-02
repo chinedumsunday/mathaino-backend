@@ -64,8 +64,11 @@ async function notifyUsers(userIds, { title, message, type, data, scheduledFor }
     select: { pushToken: true },
   });
 
-  // Don't block the request on push delivery
-  sendExpoPush(users.map(u => u.pushToken), { title, message, data }).catch(() => {});
+  // Don't block the request on push delivery. The type rides along in the
+  // push payload so the app can deep-link when the notification is tapped.
+  sendExpoPush(users.map(u => u.pushToken), {
+    title, message, data: { ...(data || {}), ...(type && { type }) },
+  }).catch(() => {});
 }
 
 module.exports = { notifyUsers, sendExpoPush };

@@ -3,10 +3,11 @@ const asyncHandler = require('../utils/asyncHandler');
 
 /**
  * POST /api/auth/register
- * Register a new user (Student, Lecturer, or Faculty)
+ * Public registration — always creates a STUDENT account. Lecturer and
+ * faculty accounts can only be created by admins (see /users/lecturers).
  */
 const register = asyncHandler(async (req, res) => {
-  const result = await AuthService.register(req.body);
+  const result = await AuthService.register({ ...req.body, role: 'STUDENT' });
 
   res.status(201).json({
     success: true,

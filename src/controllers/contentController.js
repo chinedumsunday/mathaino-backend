@@ -1,6 +1,19 @@
 const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+const { stripQuizAnswers, isCourseManager } = require('../utils/contentSanitizer');
+
+// Students may only read content of courses they're actively enrolled in
+async function assertReadAccess(user, course) {
+  if (isCourseManager(user, course)) return true;
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { userId_courseId: { userId: user.id, courseId: course.id } },
+  });
+  if (!enrollment || !['ENROLLED', 'COMPLETED'].includes(enrollment.status)) {
+    throw ApiError.forbidden('Enroll in this course to access its content');
+  }
+  return false;
+}
 
 /**
  * POST /api/modules/:moduleId/content
@@ -43,10 +56,15 @@ const createContent = asyncHandler(async (req, res) => {
 const listContent = asyncHandler(async (req, res) => {
   const { moduleId } = req.params;
 
-  const contents = await prisma.content.findMany({
+  const mod = await prisma.module.findUnique({ where: { id: moduleId }, include: { course: true } });
+  if (!mod) throw ApiError.notFound('Module not found');
+  const isManager = await assertReadAccess(req.user, mod.course);
+
+  let contents = await prisma.content.findMany({
     where: { moduleId },
     orderBy: { sortOrder: 'asc' },
   });
+  if (!isManager) contents = contents.map(stripQuizAnswers);
 
   res.json({ success: true, data: { contents } });
 });
@@ -56,12 +74,15 @@ const listContent = asyncHandler(async (req, res) => {
  * Get single content item
  */
 const getContent = asyncHandler(async (req, res) => {
-  const content = await prisma.content.findUnique({
+  let content = await prisma.content.findUnique({
     where: { id: req.params.id },
     include: { module: { include: { course: true } } },
   });
 
   if (!content) throw ApiError.notFound('Content not found');
+
+  const isManager = await assertReadAccess(req.user, content.module.course);
+  if (!isManager) content = stripQuizAnswers(content);
 
   res.json({ success: true, data: { content } });
 });

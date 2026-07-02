@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+const { stripQuizAnswers, isCourseManager } = require('../utils/contentSanitizer');
 
 /**
  * POST /api/courses
@@ -101,6 +102,23 @@ const getCourse = asyncHandler(async (req, res) => {
   const enrollment = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId: req.user.id, courseId: course.id } },
   });
+
+  const isManager = isCourseManager(req.user, course);
+
+  // Draft courses are only visible to managers (and anyone already enrolled
+  // before the course was unpublished)
+  if (!course.isPublished && !isManager) {
+    const hasAccess = enrollment && enrollment.status !== 'DROPPED';
+    if (!hasAccess) throw ApiError.notFound('Course not found');
+  }
+
+  // Never ship quiz answers to non-managers
+  if (!isManager) {
+    course.modules = course.modules.map(m => ({
+      ...m,
+      contents: (m.contents || []).map(stripQuizAnswers),
+    }));
+  }
 
   res.json({
     success: true,

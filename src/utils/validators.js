@@ -1,38 +1,17 @@
 const Joi = require('joi');
 
+// Public self-registration only creates STUDENT accounts. Lecturer and
+// faculty accounts are provisioned by admins via /users/lecturers.
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(8).required(),
   firstName: Joi.string().min(1).max(50).required(),
   lastName: Joi.string().min(1).max(50).required(),
   phone: Joi.string().optional(),
-  role: Joi.string().valid('STUDENT', 'LECTURER', 'FACULTY').default('STUDENT'),
-  // Role-specific fields
-  department: Joi.string().when('role', {
-    is: Joi.valid('FACULTY', 'LECTURER'),
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  matricNumber: Joi.string().when('role', {
-    is: 'STUDENT',
-    then: Joi.optional(),
-    otherwise: Joi.forbidden(),
-  }),
-  level: Joi.string().when('role', {
-    is: 'STUDENT',
-    then: Joi.optional(),
-    otherwise: Joi.forbidden(),
-  }),
-  specialization: Joi.string().when('role', {
-    is: 'LECTURER',
-    then: Joi.optional(),
-    otherwise: Joi.forbidden(),
-  }),
-  title: Joi.string().when('role', {
-    is: 'FACULTY',
-    then: Joi.optional(),
-    otherwise: Joi.forbidden(),
-  }),
+  role: Joi.string().valid('STUDENT').default('STUDENT'),
+  department: Joi.string().allow('').optional(),
+  matricNumber: Joi.string().allow('').optional(),
+  level: Joi.string().allow('').optional(),
 });
 
 const loginSchema = Joi.object({

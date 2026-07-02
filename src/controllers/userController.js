@@ -85,12 +85,21 @@ const changeRole = asyncHandler(async (req, res) => {
   const { role } = req.body;
   const { id } = req.params;
 
+  // SUPER_ADMIN cannot be granted through the API — only the seed/DB can
+  if (!['STUDENT', 'LECTURER', 'FACULTY'].includes(role)) {
+    throw ApiError.badRequest('role must be STUDENT, LECTURER, or FACULTY');
+  }
+
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw ApiError.notFound('User not found');
 
   // Prevent demoting yourself
   if (id === req.user.id) {
     throw ApiError.badRequest('Cannot change your own role');
+  }
+
+  if (user.role === 'SUPER_ADMIN') {
+    throw ApiError.forbidden('Super admin accounts cannot be modified');
   }
 
   const updated = await prisma.user.update({
@@ -124,11 +133,19 @@ const changeStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const { id } = req.params;
 
+  if (!['ACTIVE', 'SUSPENDED', 'PENDING', 'DEACTIVATED'].includes(status)) {
+    throw ApiError.badRequest('Invalid status');
+  }
+
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw ApiError.notFound('User not found');
 
   if (id === req.user.id) {
     throw ApiError.badRequest('Cannot change your own status');
+  }
+
+  if (user.role === 'SUPER_ADMIN') {
+    throw ApiError.forbidden('Super admin accounts cannot be modified');
   }
 
   const updated = await prisma.user.update({
@@ -355,4 +372,25 @@ const getLeaderboard = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { users, period } });
 });
 
-module.exports = { listUsers, getUser, changeRole, changeStatus, updateProfile, updatePushToken, getStats, createLecturer, createStudent, getLeaderboard };
+/**
+ * DELETE /api/users/me
+ * Permanently delete the caller's own account (app-store requirement).
+ * Removes the Firebase auth user and the database record (cascades to
+ * enrollments, submissions, notifications, etc.).
+ */
+const deleteMe = asyncHandler(async (req, res) => {
+  if (req.user.role === 'SUPER_ADMIN') {
+    throw ApiError.badRequest('The super admin account cannot be deleted from the app');
+  }
+
+  const { admin } = require('../config/firebase');
+
+  await prisma.user.delete({ where: { id: req.user.id } });
+  if (req.user.firebaseUid) {
+    await admin.auth().deleteUser(req.user.firebaseUid).catch(() => {});
+  }
+
+  res.json({ success: true, message: 'Account deleted' });
+});
+
+module.exports = { listUsers, getUser, changeRole, changeStatus, updateProfile, updatePushToken, getStats, createLecturer, createStudent, getLeaderboard, deleteMe };

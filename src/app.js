@@ -22,13 +22,26 @@ app.use(cors({
 }));
 
 // ─── Rate Limiting ───────────────────────────────────────
+// General limit is generous: a student in a live class sends a heartbeat
+// every 10s (~90 requests per 15-min window) on top of normal app usage.
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: { message: 'Too many requests, try again later' } },
 });
+
+// Tighter limit on auth endpoints to slow credential stuffing / OTP abuse
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { message: 'Too many attempts, please wait a few minutes' } },
+});
+
+app.use('/api/auth', authLimiter);
 app.use('/api', limiter);
 
 // ─── Parsing & Logging ──────────────────────────────────

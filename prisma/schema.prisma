@@ -44,6 +44,8 @@ model User {
   socialComments  SocialComment[]
   liveSessions    LiveSession[]
   attendances     SessionAttendance[]
+  courseworkDocs  CourseworkDoc[]  @relation("CourseworkLecturer")
+  courseworkReviews CourseworkDoc[] @relation("CourseworkReviewer")
 
   @@map("users")
 }
@@ -393,6 +395,34 @@ model SocialComment {
   createdAt DateTime   @default(now()) @map("created_at")
 
   @@map("social_comments")
+}
+
+// Lecturers who can't (or don't want to) use the in-app course builder
+// submit their exam/coursework documents here; admins review the queue and
+// add the material to the app on their behalf.
+model CourseworkDoc {
+  id           String           @id @default(uuid())
+  lecturerId   String           @map("lecturer_id")
+  title        String
+  courseCode   String?          @map("course_code")
+  description  String?
+  fileUrl      String           @map("file_url")
+  status       CourseworkStatus @default(PENDING)
+  adminNote    String?          @map("admin_note")
+  reviewedById String?          @map("reviewed_by_id")
+  reviewedAt   DateTime?        @map("reviewed_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  lecturer     User             @relation("CourseworkLecturer", fields: [lecturerId], references: [id], onDelete: Cascade)
+  reviewedBy   User?            @relation("CourseworkReviewer", fields: [reviewedById], references: [id])
+
+  @@map("coursework_docs")
+}
+
+enum CourseworkStatus {
+  PENDING
+  ADDED
+  DECLINED
 }
 
 model PasswordReset {

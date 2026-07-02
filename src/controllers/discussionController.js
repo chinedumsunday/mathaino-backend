@@ -1,6 +1,22 @@
 const prisma = require('../config/database');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+const { isCourseManager } = require('../utils/contentSanitizer');
+
+// Posting requires being the course manager or an actively enrolled student
+async function assertPostAccess(user, courseId) {
+  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  if (!course) throw ApiError.notFound('Course not found');
+  if (isCourseManager(user, course)) return course;
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { userId_courseId: { userId: user.id, courseId } },
+  });
+  if (!enrollment || !['ENROLLED', 'COMPLETED'].includes(enrollment.status)) {
+    throw ApiError.forbidden('Enroll in this course to join the discussion');
+  }
+  return course;
+}
 
 /**
  * GET /api/courses/:courseId/discussions
@@ -48,14 +64,13 @@ const createDiscussion = asyncHandler(async (req, res) => {
 
   if (!body?.trim()) throw ApiError.badRequest('Post body cannot be empty');
 
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
-  if (!course) throw ApiError.notFound('Course not found');
+  await assertPostAccess(req.user, courseId);
 
   const discussion = await prisma.courseDiscussion.create({
     data: { courseId, userId: req.user.id, body: body.trim() },
     include: {
       user: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, role: true } },
-      replies: [],
+      replies: true,
       _count: { select: { replies: true } },
     },
   });
@@ -69,10 +84,14 @@ const createDiscussion = asyncHandler(async (req, res) => {
 const deleteDiscussion = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const discussion = await prisma.courseDiscussion.findUnique({ where: { id } });
+  const discussion = await prisma.courseDiscussion.findUnique({
+    where: { id },
+    include: { course: { select: { creatorId: true } } },
+  });
   if (!discussion) throw ApiError.notFound('Discussion post not found');
 
-  if (discussion.userId !== req.user.id && !['FACULTY', 'SUPER_ADMIN'].includes(req.user.role)) {
+  const isCourseOwner = discussion.course.creatorId === req.user.id;
+  if (discussion.userId !== req.user.id && !isCourseOwner && !['FACULTY', 'SUPER_ADMIN'].includes(req.user.role)) {
     throw ApiError.forbidden('Not authorized to delete this post');
   }
 
@@ -92,6 +111,8 @@ const createReply = asyncHandler(async (req, res) => {
   const discussion = await prisma.courseDiscussion.findUnique({ where: { id: discussionId } });
   if (!discussion) throw ApiError.notFound('Discussion post not found');
 
+  await assertPostAccess(req.user, discussion.courseId);
+
   const reply = await prisma.discussionReply.create({
     data: { discussionId, userId: req.user.id, body: body.trim() },
     include: {
@@ -108,10 +129,14 @@ const createReply = asyncHandler(async (req, res) => {
 const deleteReply = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const reply = await prisma.discussionReply.findUnique({ where: { id } });
+  const reply = await prisma.discussionReply.findUnique({
+    where: { id },
+    include: { discussion: { include: { course: { select: { creatorId: true } } } } },
+  });
   if (!reply) throw ApiError.notFound('Reply not found');
 
-  if (reply.userId !== req.user.id && !['FACULTY', 'SUPER_ADMIN'].includes(req.user.role)) {
+  const isCourseOwner = reply.discussion.course.creatorId === req.user.id;
+  if (reply.userId !== req.user.id && !isCourseOwner && !['FACULTY', 'SUPER_ADMIN'].includes(req.user.role)) {
     throw ApiError.forbidden('Not authorized to delete this reply');
   }
 

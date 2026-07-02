@@ -46,6 +46,15 @@ const getSubmission = asyncHandler(async (req, res) => {
   const { role, id: userId } = req.user;
 
   if (['LECTURER', 'FACULTY', 'SUPER_ADMIN'].includes(role)) {
+    // Lecturers may only see submissions for their own courses
+    const content = await prisma.content.findUnique({
+      where: { id: contentId },
+      include: { module: { include: { course: true } } },
+    });
+    if (!content) throw ApiError.notFound('Content not found');
+    if (content.module.course.creatorId !== userId && !['FACULTY', 'SUPER_ADMIN'].includes(role)) {
+      throw ApiError.forbidden('Not authorized to view these submissions');
+    }
     const submissions = await prisma.submission.findMany({
       where: { contentId },
       include: {

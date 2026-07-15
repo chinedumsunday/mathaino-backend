@@ -18,6 +18,9 @@ router.get('/health', (req, res) => {
     // 'jaas' = in-app live classes use 8x8 rooms with signed JWTs (no
     // moderator login prompt); 'public-fallback' = JAAS_* env vars missing
     liveClassrooms: jaas.isConfigured() ? 'jaas' : 'public-fallback',
+    // true = the env var holds a real key (placeholder values count as missing)
+    aiChat: !!(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your-anthropic-api-key'),
+    youtubeSearch: !!(process.env.YOUTUBE_API_KEY && process.env.YOUTUBE_API_KEY !== 'AIza...'),
   });
 });
 

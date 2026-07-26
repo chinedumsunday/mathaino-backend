@@ -225,4 +225,64 @@ const myCourses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { courses } });
 });
 
-module.exports = { createCourse, listCourses, getCourse, updateCourse, deleteCourse, togglePublish, myCourses };
+/**
+ * PATCH /api/courses/:id/assign
+ * Faculty/admin reassigns a course to a lecturer (the brief's "Faculty
+ * assigns courses"). Transfers ownership, so the lecturer can manage
+ * content, approve enrollments, and schedule live classes for it.
+ * Body: { lecturerId }
+ */
+const assignCourse = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { lecturerId } = req.body;
+
+  if (!lecturerId) throw ApiError.badRequest('lecturerId is required');
+
+  const course = await prisma.course.findUnique({
+    where: { id },
+    include: { creator: { select: { id: true, firstName: true, lastName: true } } },
+  });
+  if (!course) throw ApiError.notFound('Course not found');
+
+  const lecturer = await prisma.user.findUnique({ where: { id: lecturerId } });
+  if (!lecturer) throw ApiError.notFound('Lecturer not found');
+  if (!['LECTURER', 'FACULTY'].includes(lecturer.role)) {
+    throw ApiError.badRequest('Courses can only be assigned to lecturers or faculty');
+  }
+  if (lecturer.status !== 'ACTIVE') throw ApiError.badRequest('That account is not active');
+  if (lecturer.id === course.creatorId) {
+    throw ApiError.badRequest('This course is already assigned to that lecturer');
+  }
+
+  const updated = await prisma.course.update({
+    where: { id },
+    data: { creatorId: lecturer.id },
+    include: { creator: { select: { id: true, firstName: true, lastName: true, email: true } } },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: req.user.id,
+      action: 'ASSIGN_COURSE',
+      entity: 'Course',
+      entityId: id,
+      metadata: { from: course.creatorId, to: lecturer.id },
+    },
+  });
+
+  const { notifyUsers } = require('../services/notificationService');
+  await notifyUsers([lecturer.id], {
+    title: '📚 Course Assigned to You',
+    message: `${course.title} (${course.code}) has been assigned to you. You can now manage its content, students, and live classes.`,
+    type: 'course_assigned',
+    data: { courseId: id },
+  });
+
+  res.json({
+    success: true,
+    message: `Course assigned to ${lecturer.firstName} ${lecturer.lastName}`,
+    data: { course: updated },
+  });
+});
+
+module.exports = { createCourse, listCourses, getCourse, updateCourse, deleteCourse, togglePublish, myCourses, assignCourse };

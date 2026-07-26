@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { createCourse, listCourses, getCourse, updateCourse, deleteCourse, togglePublish, myCourses } = require('../controllers/courseController');
+const { createCourse, listCourses, getCourse, updateCourse, deleteCourse, togglePublish, myCourses, assignCourse } = require('../controllers/courseController');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 
@@ -17,5 +17,8 @@ router.delete('/:id', authorize('LECTURER', 'SUPER_ADMIN'), deleteCourse);
 
 // Publish toggle
 router.patch('/:id/publish', authorize('LECTURER', 'FACULTY', 'SUPER_ADMIN'), togglePublish);
+
+// Assign course to a lecturer (faculty/admin)
+router.patch('/:id/assign', authorize('FACULTY', 'SUPER_ADMIN'), assignCourse);
 
 module.exports = router;

@@ -51,6 +51,12 @@ app.use(morgan('dev', {
   stream: { write: (msg) => logger.info(msg.trim()) },
 }));
 
+// ─── Client demo window ─────────────────────────────────
+// Mounted after CORS so refusals still carry CORS headers (otherwise the
+// browser reports a CORS failure instead of showing our message), and before
+// the routes so no handler runs once the window has closed.
+app.use('/api', require('./middleware/demoWindow'));
+
 // ─── Routes ─────────────────────────────────────────────
 app.use('/api', routes);
 
